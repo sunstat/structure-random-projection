@@ -2,6 +2,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensorly as tl
 
+def random_matrix_generator(m, n, typ = 'g', std = 1, sparse_factor = 0.1):
+    types = set(['g', 'u', 'sp'])
+    assert typ in types, "please aset your type of random variable correctly"
+    if typ == 'g':
+        return np.random.normal(0,1, size = (m,n))*std
+    elif typ == 'u':
+        return np.random.uniform(low = -1, high = 1, size = (m,n))*np.sqrt(3)*std
+    elif typ == 'sp':
+        return np.random.binomial(n = 1,p = sparse_factor,size = (m,n))*\
+        np.random.choice([-1,1], size = (m,n))*np.sqrt(3)*std
 
 class Simulation(object):
     """docstring for Simulation""" 
@@ -28,19 +38,19 @@ class Simulation(object):
             kron_err = [] 
             for i in range(self.num_runs):
                 # type of the random matrices: "kron" (Kronecker), "krao" (Khatri-Rao)
-                mat_gauss = np.random.normal(0, 1, (self.k,m))/np.sqrt(self.k)
-                gaussian_err.append(np.linalg.norm(mat_gauss @ self.X)\
+                mat = random_matrix_generator(self.k,m)/np.sqrt(self.k)
+                gaussian_err.append(np.linalg.norm(mat @ self.X)\
                     /np.linalg.norm(self.X))
-                mat_krao1 = np.random.normal(0, 1, (self.k,int(m/self.split[1]))) 
-                mat_krao2 = np.random.normal(0, 1, (self.k,self.split[1]))
+                mat_krao1 = random_matrix_generator(self.k,int(m/self.split[1]))
+                mat_krao2 = random_matrix_generator(self.k,self.split[1])
                 mat_krao = tl.tenalg.khatri_rao([mat_krao1.T,mat_krao2.T]).T
                 krao_err.append(np.linalg.norm\
                     (mat_krao @ self.X)\
                     /np.sqrt(self.k)/np.linalg.norm(self.X)) 
-                mat_kron1 = np.random.normal(0,1,(int(self.k/self.split[0]),\
-                    int(m/self.split[1]))) 
-                mat_kron2 = np.random.normal(0,1,(self.split[0],\
-                 self.split[1]))  
+                mat_kron1 = random_matrix_generator(int(self.k/self.split[0]),\
+                    int(m/self.split[1]))
+                mat_kron2 = random_matrix_generator(self.split[0],\
+                 self.split[1])
                 mat_kron = np.kron(mat_kron1,mat_kron2)
                 kron_err.append(np.linalg.norm(mat_kron @ self.X)\
                     /np.sqrt(self.k)/np.linalg.norm(self.X)) 
@@ -51,16 +61,16 @@ class Simulation(object):
             kron_err = [] 
             for i in range(self.num_runs):
                 print(i)
-                mat_gauss = np.random.normal(0, 1, (self.k,m))
-                mat_krao1 = np.random.normal(0, 1, (self.k,int(m/self.split[1]))) 
-                mat_krao2 = np.random.normal(0, 1, (self.k,int(self.split[1])))
-                mat_kron1 = np.random.normal(0,1,(self.k/self.split[0],\
-                    (m/self.split[1]))) 
-                mat_kron2 = np.random.normal(0,1,\
-                    (self.split[0], self.split[1])) 
+                mat = random_matrix_generator(self.k,m)
+                mat_krao1 = random_matrix_generator(self.k,int(m/self.split[1])) 
+                mat_krao2 = random_matrix_generator(self.k,int(self.split[1]))
+                mat_kron1 = random_matrix_generator(self.k/self.split[0],\
+                    (m/self.split[1]))
+                mat_kron2 = random_matrix_generator \
+                    (self.split[0], self.split[1])
                 mat_krao = tl.tenalg.khatri_rao([mat_krao1.T,mat_krao2.T]).T
                 mat_kron = np.kron(mat_kron1,mat_kron2)
-                gaussian_err.append(np.linalg.norm(A.T @ A @ mat_gauss-self.X)\
+                gaussian_err.append(np.linalg.norm(A.T @ A @ mat-self.X)\
                     /np.linalg.norm(self.X)) 
                 krao_err.append(np.linalg.norm(A.T @ A @ mat_krao-self.X)\
                     /np.linalg.norm(self.X))  

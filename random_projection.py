@@ -3,15 +3,22 @@ import matplotlib.pyplot as plt
 import tensorly as tl
 
 def random_matrix_generator(m, n, typ = 'g', std = 1, sparse_factor = 0.5):
-    types = set(['g', 'u', 'sp'])
+    types = set(['g', 'u', 'sp', 'sp0', 'sp1'])
     assert typ in types, "please aset your type of random variable correctly"
     if typ == 'g':
         return np.random.normal(0,1, size = (m,n))*std
     elif typ == 'u':
         return np.random.uniform(low = -1, high = 1, size = (m,n))*np.sqrt(3)*std
+    elif typ == 'sp0':
+        # Result from Achlioptas
+        return np.random.choice([-1,0,1], size = (m,n), p = [1/6, 2/3,1/6])*np.sqrt(3)*std 
+    elif typ == 'sp1': 
+        # Result from Ping Li 
+        return np.random.binomial(n = 1,p = np.sqrt(1/np.sqrt(n)),size = (m,n))*\
+        np.random.choice([-1,1], size = (m,n))*std*np.sqrt(np.sqrt(n))
     elif typ == 'sp':
         return np.random.binomial(n = 1,p = sparse_factor,size = (m,n))*\
-        np.random.choice([-1,1], size = (m,n))*np.sqrt(3)*std
+        np.random.choice([-1,1], size = (m,n))*std*np.sqrt(1/sparse_factor)
 
 class Simulation(object):
     """docstring for Simulation""" 
@@ -83,7 +90,7 @@ class Simulation(object):
 if __name__ == '__main__':
 
     X1 = np.random.normal(0,1, (10000,1000)) 
-    sim_len = Simulation(X1, "len", 20, (5,10), 'sp') 
+    sim_len = Simulation(X1, "len", 20, (5,10), 'sp0') 
     rel_err = sim_len.run_sim() 
 
     plt.figure()
@@ -94,6 +101,8 @@ if __name__ == '__main__':
     plt.hist(rel_err[2])
     print("kron: mean" + str(np.mean(rel_err[2]))+"variance:" +str(np.var(rel_err[2])))
     plt.show()
+
+
 
 
 '''

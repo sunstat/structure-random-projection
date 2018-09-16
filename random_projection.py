@@ -3,12 +3,14 @@ import matplotlib.pyplot as plt
 import tensorly as tl
 
 def random_matrix_generator(m, n, typ = 'g', std = 1, sparse_factor = 0.5):
-    types = set(['g', 'u', 'sp', 'sp0', 'sp1'])
+    types = set(['g', 'u', 'sp', 'sp0', 'sp1', 'sgn'])
     assert typ in types, "please aset your type of random variable correctly"
     if typ == 'g':
         return np.random.normal(0,1, size = (m,n))*std
     elif typ == 'u':
         return np.random.uniform(low = -1, high = 1, size = (m,n))*np.sqrt(3)*std
+    elif typ == 'sgn':
+        return np.random.choice([-1,1], size = (m,n), p = [1/2, 1/2])*std 
     elif typ == 'sp0':
         # Result from Achlioptas
         return np.random.choice([-1,0,1], size = (m,n), p = [1/6, 2/3,1/6])*np.sqrt(3)*std 
@@ -39,6 +41,7 @@ class Simulation(object):
         self.gen_typ = gen_typ
 
     def run_sim(self):
+        np.random.seed(self.seed)
         m, n = self.X.shape 
         if self.sim_typ == "len": 
             gaussian_err = [] 
@@ -87,10 +90,12 @@ class Simulation(object):
             rel_err = [gaussian_err,krao_err,kron_err]
         return rel_err
 
+#def plot_sim(rel_err, name, label)
+
 if __name__ == '__main__':
 
     X1 = np.random.normal(0,1, (10000,1000)) 
-    sim_len = Simulation(X1, "len", 20, (5,10), 'sp0') 
+    sim_len = Simulation(X1, "len", 20, (5,10), 'sgn') 
     rel_err = sim_len.run_sim() 
 
     plt.figure()

@@ -107,7 +107,7 @@ def plot_sim(results, ks, gen_typ, title, name):
     plt.show()
 
 
-def run_sim_storage(k, ncol, gen_typ = 'g', num_runs = 100, seed = 1): 
+def run_sim_storage0(k, ncol, gen_typ = 'g', num_runs = 100, seed = 1): 
     np.random.seed(seed)
     reg_err = [] 
     krao_err = []
@@ -129,29 +129,8 @@ def run_sim_storage(k, ncol, gen_typ = 'g', num_runs = 100, seed = 1):
     return rel_err
 
 
-def run_sim_multityps_storage(k, ncol, gen_typs, num_runs = 100, seed = 1): 
-    np.random.seed(seed)
-    reg_err = [] 
-    krao_err = []
-    for i in range(num_runs):
-        # type of the random matrices: "kron" (Kronecker), "krao" (Khatri-Rao)
-        X = np.random.normal(0,1,(ncol,100)) 
-        mat = random_matrix_generator(k,ncol, 'g')/np.sqrt(k)
-        reg_err.append(np.linalg.norm(mat @ X)\
-            /np.linalg.norm(X))
-        X = np.random.normal(0,1,(int(ncol**2/4),100)) 
-        mat_kraos = []
-        mat_kraos.append(random_matrix_generator(k, int(ncol**2/4), gen_typ).T)
-        mat_krao = tl.tenalg.khatri_rao(mat_kraos).T 
-        krao_err.append(np.linalg.norm\
-            (mat_krao @ X)\
-            /np.sqrt(k)/np.linalg.norm(X)) 
-    rel_err = [reg_err,krao_err]
-    return rel_err
 
-
-
-def run_sims_storage(k, ncols, gen_typ = 'g', num_runs = 100, seed = 1):  
+def run_sims_storage0(k, ncols, gen_typ = 'g', num_runs = 100, seed = 1):  
     # ncols is the number of storage columns 
     # For simplicity, Khatri-Rao has size k * (ncols**2/4), Gaussian has size k * ncols 
     [reg_errs, reg_stds, krao_errs, krao_stds] = [], [], [], []
@@ -176,6 +155,73 @@ def plot_sim_storage(results, ncols, gen_typ, title, name):
     plt.savefig('plots/'+name)
     plt.show()
 
+def sum_list(lst):
+    sum = 0
+    for i in range(len(lst)):
+        sum = lst[i]+sum
+    return sum
+def run_sim_multityps_storage(k, ncol, gen_typs, num_runs = 100, seed = 1): 
+    np.random.seed(seed)
+    rel_err = [] 
+    for gen_typ in gen_typs:
+        reg_err = []
+        krao_err = []
+        for i in range(num_runs):
+            X = np.random.normal(0,1,(int(ncol**2/4),100)) 
+            mat = random_matrix_generator(k,int(ncol**2/4), gen_typ)/np.sqrt(k)
+            reg_err.append(np.linalg.norm(mat @ X)\
+                /np.linalg.norm(X))
+            
+            X = np.random.normal(0,1,(int(ncol**2/4),100)) 
+            reps = int(int(ncol**2/4)/ncol)
+            #reps = 1
+            proj = [] # projected vector
+            for j in np.arange(reps):
+                mat_kraos = []
+                mat_kraos.append(random_matrix_generator(k, int(ncol/2), gen_typ).T)
+                mat_kraos.append(random_matrix_generator(k, int(ncol/2), gen_typ).T)
+                mat_krao = tl.tenalg.khatri_rao(mat_kraos).T 
+                proj.append(mat_krao @ X)
+            proj = proj[:reps]
+            krao_err.append(np.linalg.norm\
+                (sum_list(proj)/np.sqrt(reps))\
+                /np.sqrt(k)/np.linalg.norm(X))  
+        rel_err.append(np.asarray(reg_err))
+        rel_err.append(np.asarray(krao_err))
+    return rel_err
+
+def run_sims_multityps_storage(k, ncols, gen_typs, num_runs = 100, seed = 1):
+    result = []
+    for i in np.arange(4*len(gen_typs)):
+        result.append([])
+    for ncol in ncols:
+        rel_err = run_sim_multityps_storage(k, ncol, gen_typs, num_runs, seed)
+        for i in np.arange(len(gen_typs)):
+            result[4*i] = np.append(result[4*i], np.mean(rel_err[2*i])) 
+            result[4*i+1] = np.append(result[4*i+1], np.std(rel_err[2*i]))
+            result[4*i+2] = np.append(result[4*i+2], np.mean(rel_err[2*i+1]))
+            result[4*i+3] = np.append(result[4*i+3], np.std(rel_err[2*i+1]))
+    return result
+
+
+
+def plot_sim_storage_multityp(results, ncols, gen_typs, title, name): 
+    plt.figure(figsize=(6,5))
+    for i,gen_typ in enumerate(gen_typs):
+        label = find_label(gen_typ)
+        print(label)
+        print(results[4*i])
+        print(2*results[4*i+1])
+        plt.errorbar(ncols, results[4*i], 2*results[4*i+1], label = label[0], capsize = 5)
+        plt.errorbar(ncols, results[4*i+2], 2*results[4*i+3], label = label[1], capsize = 5)
+    plt.legend(loc = 'best')
+    plt.xlabel('Number of Stored Columns')
+    plt.ylabel('Relative Length after Transformation')
+    plt.title(title)
+    plt.savefig('plots/'+name)
+    plt.show()
+
+
 
 def gauss_sgn(k, ncol, ks, ms, gen_typs = 'g', num_runs = 100, seed = 1): 
     [reg_errs, reg_stds, krao_errs, krao_stds] = [], [], [], []
@@ -192,6 +238,11 @@ def gauss_sgn(k, ncol, ks, ms, gen_typs = 'g', num_runs = 100, seed = 1):
 if __name__ == '__main__':
     ncols = np.arange(20, 110, 10)  
     k = 30
+    gen_typs = ['g', 'u', 'sgn']
+
+    result = run_sims_multityps_storage(k, ncols,gen_typs)
+    plot_sim_storage_multityp(result, ncols, gen_typs, "multiplots", "multiplots.pdf")
+'''
     results_storage1 = run_sims_storage(k, ncols, 'g')
     plot_sim_storage(results_storage1, ncols, 'g', "Random Projection under Storage Constraint, k = 30", "g_store.pdf")  
     results_storage2 = run_sims_storage(k, ncols, 'u')
@@ -199,7 +250,7 @@ if __name__ == '__main__':
     results_storage3 = run_sims_storage(k, ncols, 'sgn')
     plot_sim_storage(results_storage3, ncols, 'sgn', "Random Projection under Storage Constraint, k = 30", "sgn_store.pdf")  
 
-
+''' 
 
 '''
     # Gaussian case with limited storage

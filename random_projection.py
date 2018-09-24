@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensorly as tl
 
-def random_matrix_generator(m, n, typ = 'g', std = 1, sparse_factor = 0.5):
+def random_matrix_generator(m, n, typ = 'g', std = 1, sparse_factor = 0.1):
     types = set(['g', 'u', 'sp', 'sp0', 'sp1', 'sgn'])
     assert typ in types, "please aset your type of random variable correctly"
     if typ == 'g':
@@ -16,11 +16,11 @@ def random_matrix_generator(m, n, typ = 'g', std = 1, sparse_factor = 0.5):
         return np.random.choice([-1,0,1], size = (m,n), p = [1/6, 2/3,1/6])*np.sqrt(3)*std 
     elif typ == 'sp1': 
         # Result from Ping Li 
-        return np.random.binomial(n = 1,p = np.sqrt(1/np.sqrt(n)),size = (m,n))*\
-        np.random.choice([-1,1], size = (m,n))*std*np.sqrt(np.sqrt(n))
+        return np.random.choice([-1, 0, 1], size = (m,n), p = \
+            [1/(2*np.sqrt(n)), 1- 1/np.sqrt(n), 1/(2*np.sqrt(n))])*np.sqrt(np.sqrt(n))*std
     elif typ == 'sp':
-        return np.random.binomial(n = 1,p = sparse_factor,size = (m,n))*\
-        np.random.choice([-1,1], size = (m,n))*std*np.sqrt(1/sparse_factor)
+        return np.random.choice([-1,0,1], size = (m,n), p = [sparse_factor/2, \
+            1- sparse_factor, sparse_factor/2])*np.sqrt(1/sparse_factor)*std
 
 class Simulation(object):
     """docstring for Simulation""" 
@@ -52,7 +52,7 @@ class Simulation(object):
                 mat = random_matrix_generator(self.k,m, self.gen_typ)/np.sqrt(self.k)
                 gaussian_err.append(np.linalg.norm(mat @ self.X)\
                     /np.linalg.norm(self.X))
-                mat_krao1 = random_matrix_generator(self.k,int(m/self.split[1]), self.gen_typ)
+                mat_krao1 = random_matrix_generator(self.k, int(m/self.split[1]), self.gen_typ)
                 mat_krao2 = random_matrix_generator(self.k,self.split[1], self.gen_typ)
                 mat_krao = tl.tenalg.khatri_rao([mat_krao1.T,mat_krao2.T]).T
                 krao_err.append(np.linalg.norm\
@@ -95,7 +95,7 @@ class Simulation(object):
 if __name__ == '__main__':
 
     X1 = np.random.normal(0,1, (10000,1000)) 
-    sim_len = Simulation(X1, "len", 20, (5,10), 'sgn') 
+    sim_len = Simulation(X1, "len", 20, (5,10), 'sp1') 
     rel_err = sim_len.run_sim() 
 
     plt.figure()

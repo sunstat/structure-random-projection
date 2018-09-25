@@ -182,7 +182,6 @@ def run_sim_multityps_storage(k, ncol, gen_typs, num_runs = 100, seed = 1):
                 mat_kraos.append(random_matrix_generator(k, int(ncol/2), gen_typ).T)
                 mat_krao = tl.tenalg.khatri_rao(mat_kraos).T 
                 proj.append(mat_krao @ X)
-            proj = proj[:reps]
             krao_err.append(np.linalg.norm\
                 (sum_list(proj)/np.sqrt(reps))\
                 /np.sqrt(k)/np.linalg.norm(X))  
@@ -236,7 +235,7 @@ def gauss_sgn(k, ncol, ks, ms, gen_typs = 'g', num_runs = 100, seed = 1):
 
 
 if __name__ == '__main__':
-    ncols = np.arange(20, 110, 10)  
+    ncols = np.arange(20, 30, 10)  
     k = 30
     gen_typs = ['g', 'u', 'sgn']
 

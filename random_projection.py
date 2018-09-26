@@ -22,15 +22,16 @@ def random_matrix_generator(m, n, typ = 'g', std = 1, sparse_factor = 0.1):
         return np.random.choice([-1,0,1], size = (m,n), p = [sparse_factor/2, \
             1- sparse_factor, sparse_factor/2])*np.sqrt(1/sparse_factor)*std
 
+
+'''
 class Simulation(object):
-    """docstring for Simulation""" 
-    '''
+    """
     :param X: input matrix of size m x n 
     :param sim_typ: type of the simulation "len" (length preservation), "col": 
         (column space)
     :param k: the reduced dimension
     :param split: k/split[0] * m/split[1] is the size of the kronecker component 
-    '''
+    """
     def __init__(self, X, sim_typ, k, split = (10, 10), gen_typ = 'g', num_runs = 100, seed = 1):
         self.X = X
         self.sim_typ = sim_typ  
@@ -75,25 +76,22 @@ class Simulation(object):
                 mat = random_matrix_generator(self.k,m)
                 mat_krao1 = random_matrix_generator(self.k,int(m/self.split[1]), self.gen_typ) 
                 mat_krao2 = random_matrix_generator(self.k,int(self.split[1]), self.gen_typ)
-                mat_kron1 = random_matrix_generator(self.k/self.split[0],\
-                    (m/self.split[1]), self.gen_typ)
+                mat_kron1 = random_matrix_generator(int(self.k/self.split[0]),\
+                    int(m/self.split[1]), self.gen_typ)
                 mat_kron2 = random_matrix_generator \
                     (self.split[0], self.split[1])
                 mat_krao = tl.tenalg.khatri_rao([mat_krao1.T,mat_krao2.T]).T
                 mat_kron = np.kron(mat_kron1,mat_kron2)
-                gaussian_err.append(np.linalg.norm(A.T @ A @ mat-self.X)\
+                gaussian_err.append(np.linalg.norm(mat.T @ mat @ self.X-self.X)\
                     /np.linalg.norm(self.X)) 
-                krao_err.append(np.linalg.norm(A.T @ A @ mat_krao-self.X)\
+                krao_err.append(np.linalg.norm(mat_krao.T @ mat_krao @ self.X-self.X)\
                     /np.linalg.norm(self.X))  
-                kron_err.append(np.linalg.norm(A.T @ A @ mat_kron-self.X)\
+                kron_err.append(np.linalg.norm(mat_kron.T @ mat_kron @ self.X-self.X)\
                     /np.linalg.norm(self.X)) 
             rel_err = [gaussian_err,krao_err,kron_err]
         return rel_err
 
-#def plot_sim(rel_err, name, label)
-
 if __name__ == '__main__':
-
     X1 = np.random.normal(0,1, (10000,1000)) 
     sim_len = Simulation(X1, "len", 20, (5,10), 'sp1') 
     rel_err = sim_len.run_sim() 
@@ -110,12 +108,11 @@ if __name__ == '__main__':
 
 
 
-'''
     # Column space
     # rank = 10
     X2 = np.diag(np.hstack((np.repeat(10,10), np.repeat(0,990))))
     X2 = X2 + np.random.normal(0,1,(1000, 1000)) 
-    sim_col = Simulation(X2, "len", 625, (25, 25)) 
+    sim_col = Simulation(X2, "col", 625, (25, 25)) 
     print("Gg")
     rel_err = sim_col.run_sim() 
 
@@ -130,5 +127,6 @@ if __name__ == '__main__':
     print("kron: mean: " + str(np.mean(rel_err[2]))+" variance: " \
         +str(np.var(rel_err[2])))
     plt.show()
-'''
 
+
+'''

@@ -1,96 +1,27 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorly as tl
-from random_projection import random_matrix_generator
+from util import random_matrix_generator, square_tensor_gen, geometric_median, \
+geometric_median_matrices, norm_mean_matrices
+import matplotlib.ticker as ticker
+import warnings
 import hdmedians as hd 
 
-# Implementation of the geometric median from https://stackoverflow.com/questions/30299267/geometric-median-of-multidimensional-points/30299705#30299705
-import numpy as np
-from scipy.spatial.distance import cdist, euclidean
-# a = np.array([[2., 3., 8.], [10., 4., 3.], [58., 3., 4.], [34., 2., 43.]])
-
-def geometric_median(X, eps=1e-5):
-    # Compute the geometric median for a list of vectors (rows of X) with the algorithm in http://www.pnas.org/content/pnas/97/4/1423.full.pdf
-    y = np.mean(X, 0) 
-    while True:
-        D = cdist(X, [y])
-        nonzeros = (D != 0)[:, 0]
-
-        Dinv = 1 / D[nonzeros]
-        Dinvs = np.sum(Dinv)
-        W = Dinv / Dinvs
-        T = np.sum(W * X[nonzeros], 0)
-
-        num_zeros = len(X) - np.sum(nonzeros)
-        if num_zeros == 0:
-            y1 = T
-        elif num_zeros == len(X):
-            return y
-        else:
-            R = (T - y) * Dinvs
-            r = np.linalg.norm(R)
-            rinv = 0 if r == 0 else num_zeros/r
-            y1 = max(0, 1-rinv)*T + min(1, rinv)*y
-        if euclidean(y, y1) < eps:
-            return y1
-        y = y1
-
-def geometric_median_matrices(Xs, eps = 1e-5, transpose = True, typ = 'l1'): 
-    # By default, compute the column wise geometric median
-    if typ == 'l1':
-        # For all X_i in Xs, we want to apply the geometric median to every row at the same position of the matrix
-        if not transpose:
-            result = np.zeros(Xs[0].shape)
-            num_rows = Xs[0].shape[0]
-            for i in range(num_rows):         
-                # Stack the ith row of all matrices in X
-                mat = np.stack([ Xs[j][i,:] for j in range(len(Xs))],0)
-                result[i,:] = geometric_median(mat, eps = eps)
-            return result
-        else: 
-            Xs = [X.T for X in Xs]
-            result = np.zeros(Xs[0].shape)
-            num_rows = Xs[0].shape[0]
-            for i in range(num_rows):         
-                # Stack the ith row of all matrices in X
-                mat = np.stack([ Xs[j][i,:] for j in range(len(Xs))],0)
-                result[i,:] = geometric_median(mat, eps = eps)
-            return result.T
-    elif typ == 'l2': 
-        if not transpose: 
-            result = np.zeros(Xs[0].shape)
-            num_rows = Xs[0].shape[0]
-            for i in range(num_rows):         
-                # Stack the ith row of all matrices in X
-                mat = np.stack([ Xs[j][i,:] for j in range(len(Xs))],0)
-                result[i,:] = hd.geomedian(mat, axis = 0)
-            return result
-        else: 
-            Xs = [X.T for X in Xs]
-            result = np.zeros(Xs[0].shape)
-            num_rows = Xs[0].shape[0]
-            for i in range(num_rows):         
-                # Stack the ith row of all matrices in X
-                mat = np.stack([ Xs[j][i,:] for j in range(len(Xs))],0)
-                result[i,:] = hd.geomedian(mat, axis = 0)
-            return result.T
-
-def norm_mean_matrices(Xs):
-    X2s = [X**2 for X in Xs] 
-    return np.sqrt(sum(X2s)/len(Xs))
+warnings.filterwarnings('ignore')
 
 class DimRedux(object):
     """docstring for DimRedux"""
-    def __init__(self, rm_typ, k, m, krao = False, vr = False, vr_num = 5, vr_typ = "mean"):
+    def __init__(self, rm_typ, k, m, krao = False, krao_ms = [], vr = False, vr_num = 5, vr_typ = "mean"): 
         self.rm_typ = rm_typ
         self.k = k 
         self.m = m
         self.krao = krao
+        self.krao_ms = krao_ms
         self.vr = vr
         self.vr_num = 1 if vr == False else vr_num 
         self.vr_typ = vr_typ
     def get_info(self): 
-        return [self.rm_typ, self.k, self.m, self.krao, self.vr, self.vr_num, self.vr_typ] 
+        return [self.rm_typ, self.k, self.m, self.krao, self.krao_ms, self.vr, self.vr_num, self.vr_typ] 
     def update_k(self, k): 
         self.k = k 
         return 
@@ -100,8 +31,15 @@ class DimRedux(object):
             if not self.krao:
                 reduced_mats.append((random_matrix_generator(self.k,self.m,\
                     self.rm_typ)/np.sqrt(self.k)) @ X )
+            elif self.krao_ms != []:  
+                assert(np.prod(np.asarray(self.krao_ms)) == self.m), \
+                "Please enter valid Khatri-Rao map, so that the product of Khatri-Rao map dimension matches the input dimension of X" 
+                mat_kraos = []
+                for i in range(len(self.krao_ms)): 
+                    mat_kraos.append(random_matrix_generator(self.k, self.krao_ms[i], self.rm_typ).T)
+                reduced_mats.append((tl.tenalg.khatri_rao(mat_kraos)).T @ X/ np.sqrt(self.k))
             else: 
-                # Here, assume for simplicity, m = m0**2
+                # Here, if the Khatri-Rao random map dimension is not given, assume m = m0**2
                 m0 = int(np.sqrt(self.m))
                 mat_kraos = []
                 mat_kraos.append(random_matrix_generator(self.k,m0,self.rm_typ).T) 
@@ -127,8 +65,17 @@ class DimRedux(object):
                 mat = random_matrix_generator(self.k,self.m,self.rm_typ) 
                 arm, _ = np.linalg.qr( (mat @ X).T)  
                 reduced_mats.append( X @ arm @ arm.T)
+            elif self.krao_ms != []:  
+                assert(np.prod(np.asarray(self.krao_ms)) == self.m), \
+                "Please enter valid Khatri-Rao map, so that the product of Khatri-Rao map dimension matches the input dimension of X" 
+                mat_kraos = []
+                for i in range(len(self.krao_ms)): 
+                    mat_kraos.append(random_matrix_generator(self.k, self.krao_ms[i], self.rm_typ).T)
+                mat_krao = tl.tenalg.khatri_rao(mat_kraos).T
+                arm, _ = np.linalg.qr( (mat_krao @ X).T)  
+                reduced_mats.append( X @ arm @ arm.T)
             else: 
-                # Here, assume for simplicity, m = m0**2
+                # Here, if the Khatri-Rao random map dimension is not given, assume m = m0**2
                 m0 = int(np.sqrt(self.m))
                 mat_kraos = []
                 mat_kraos.append(random_matrix_generator(self.k,m0,self.rm_typ).T) 
@@ -171,17 +118,18 @@ class Simulation(object):
 
     def run(self):
         np.random.seed(self.seed)
-        rm_typ, k, m, krao, vr, vr_num, vr_typ = self.dim_redux.get_info() 
+        rm_typ, k, m, krao, krao_ms, vr, vr_num, vr_typ = self.dim_redux.get_info() 
         m, n = self.X.shape  
         return [self.dim_redux.run(self.X)[1] for i in range(self.num_runs)] 
     def run_colspace(self):
         np.random.seed(self.seed)
-        rm_typ, k, m, krao, vr, vr_num, vr_typ = self.dim_redux.get_info() 
+        rm_typ, k, m, krao, kraos, vr, vr_num, vr_typ = self.dim_redux.get_info() 
         m, n = self.X.shape  
         return [self.dim_redux.run_colspace(self.X)[1] for i in range(self.num_runs)]   
 
 MARKER_LIST = ["s", "x", "o","+","*","d","^"]
 LINE_LIST = ['-', '--',':','-.','-.','-.','-.','-.']
+COLOR_LIST = ['r', 'g','orange', 'violet', 'b','black','y']
 
 class Simulations(object):
     """docstring for Simulations"""
@@ -195,31 +143,29 @@ class Simulations(object):
         sims_result = []
         for dim_redux in self.dim_reduxs: 
             errs = []
-            stds = [] 
-            for k in ks: 
+            CIs = np.zeros((2,len(ks)))
+            for i,k in enumerate(ks):
                 dim_redux.update_k(k)
                 sim = Simulation(self.X,dim_redux, self.num_runs, self.seed) 
                 sim_result = sim.run() 
                 errs = np.append(errs, np.mean(sim_result))
-                stds = np.append(stds, np.std(sim_result))
-            sims_result.append([errs, stds])
+                CIs[0,i] = np.percentile(sim_result, 2.5)
+                CIs[1,i] = np.percentile(sim_result, 97.5) 
+            sims_result.append([errs, CIs])
         return(sims_result)
     def plot_varyk(self, sims_result, ks, labels, title, name, fontsize = 18): 
         plt.figure(figsize=(6,5))
+        plt.rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
+        plt.rc('text', usetex=True)
         for i in range(len(self.dim_reduxs)):
-            plt.errorbar(ks, sims_result[i][0] , 2*sims_result[i][1], label = \
-                labels[i], capsize = 5, marker = MARKER_LIST[i], ls = LINE_LIST[i])
+            plt.plot(ks, sims_result[i][0], label = labels[i], \
+                marker = MARKER_LIST[i], ls ='-', color = COLOR_LIST[i])
+            plt.plot(ks, sims_result[i][1][0,:], ls = '--', color = COLOR_LIST[i] )
+            plt.plot(ks, sims_result[i][1][1,:], ls = '--', color = COLOR_LIST[i] )
         plt.legend(loc = 'best')
         plt.xlabel('Reduced Dimension')
-        plt.ylabel('Relative Squared Length after Random Projection')
+        plt.ylabel('Ratio of Squared Norm after Random Projection')
         plt.title(title)
-        plt.axes().title.set_fontsize(fontsize)
-        plt.axes().yaxis.set_major_formatter(ticker.FormatStrFormatter('%.2e')) 
-        plt.axes().xaxis.label.set_fontsize(fontsize)
-        plt.axes().yaxis.label.set_fontsize(fontsize)
-        plt.rc('legend',fontsize = fontsize)
-        plt.rc('xtick', labelsize = fontsize) 
-        plt.rc('ytick', labelsize = fontsize) 
         plt.tight_layout()
         plt.savefig('plots/'+name+'.pdf')
         plt.show()
@@ -228,32 +174,30 @@ class Simulations(object):
         sims_result = []
         for dim_redux in self.dim_reduxs: 
             errs = []
-            stds = [] 
-            for k in ks: 
+            CIs = np.zeros((2,len(ks)))
+            for i,k in enumerate(ks): 
                 dim_redux.update_k(k)
                 sim = Simulation(self.X,dim_redux, self.num_runs, self.seed) 
                 sim_result = sim.run_colspace() 
                 errs = np.append(errs, np.mean(sim_result))
-                stds = np.append(stds, np.std(sim_result))
-            sims_result.append([errs, stds])
+                CIs[0,i] = np.percentile(sim_result, 2.5)
+                CIs[1,i] = np.percentile(sim_result, 97.5) 
+            sims_result.append([errs, CIs])
         return(sims_result)
 
     def plot_colspace_varyk(self, sims_result, ks, labels, title, name, fontsize = 18):
+        plt.rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
+        plt.rc('text', usetex=True)
         plt.figure(figsize=(6,5))
         for i in range(len(self.dim_reduxs)):
-            plt.errorbar(ks, sims_result[i][0] , 2*sims_result[i][1], label = \
-                labels[i], capsize = 5, marker = MARKER_LIST[i], ls = LINE_LIST[i])
+            plt.plot(ks, sims_result[i][0], label = labels[i], \
+                marker = MARKER_LIST[i], ls ='-', color = COLOR_LIST[i])
+            plt.plot(ks, sims_result[i][1][0,:], ls = '--', color = COLOR_LIST[i] )
+            plt.plot(ks, sims_result[i][1][1,:], ls = '--', color = COLOR_LIST[i] )
         plt.legend(loc = 'best')
         plt.xlabel('Reduced Dimension')
         plt.ylabel('Relative Error')
         plt.title(title)
-        plt.axes().title.set_fontsize(fontsize)
-        plt.axes().yaxis.set_major_formatter(ticker.FormatStrFormatter('%.2e')) 
-        plt.axes().xaxis.label.set_fontsize(fontsize)
-        plt.axes().yaxis.label.set_fontsize(fontsize)
-        plt.rc('legend',fontsize = fontsize)
-        plt.rc('xtick', labelsize = fontsize) 
-        plt.rc('ytick', labelsize = fontsize) 
         plt.tight_layout()
         plt.savefig('plots/'+name + '.pdf')
         plt.show()

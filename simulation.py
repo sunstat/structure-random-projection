@@ -58,8 +58,7 @@ class DimRedux(object):
         elif self.vr_typ == "median": 
             reduced_mat = reduced_mats[0] 
             for index,x in np.ndenumerate(reduced_mat): 
-                reduced_mat[index] = np.median( [ mat[index] for mat in reduced_mats])
-            reduced_mat = reduced_mat*np.sqrt(self.vr_num)
+                reduced_mat[index] = np.median([ mat[index] for mat in reduced_mats])
         else: 
             print("Please use either mean or geom_median_l1, or geom_median_l2 for vr_typ")
         return(reduced_mat, np.linalg.norm(reduced_mat)**2/np.linalg.norm(X)**2)

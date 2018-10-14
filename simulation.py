@@ -55,6 +55,11 @@ class DimRedux(object):
                 True, typ = "l2")*np.sqrt(self.vr_num)
         elif self.vr_typ == "norm_mean": 
             reduced_mat = norm_mean_matrices(reduced_mats)
+        elif self.vr_typ == "median": 
+            reduced_mat = reduced_mats[0] 
+            for index,x in np.ndenumerate(reduced_mat): 
+                reduced_mat[index] = np.median( [ mat[index] for mat in reduced_mats])
+            reduced_mat = reduced_mat*np.sqrt(self.vr_num)
         else: 
             print("Please use either mean or geom_median_l1, or geom_median_l2 for vr_typ")
         return(reduced_mat, np.linalg.norm(reduced_mat)**2/np.linalg.norm(X)**2)
@@ -143,15 +148,17 @@ class Simulations(object):
         sims_result = []
         for dim_redux in self.dim_reduxs: 
             errs = []
+            stds = []
             CIs = np.zeros((2,len(ks)))
             for i,k in enumerate(ks):
                 dim_redux.update_k(k)
                 sim = Simulation(self.X,dim_redux, self.num_runs, self.seed) 
                 sim_result = sim.run() 
                 errs = np.append(errs, np.mean(sim_result))
+                stds = np.append(stds, np.std(sim_result)) 
                 CIs[0,i] = np.percentile(sim_result, 2.5)
                 CIs[1,i] = np.percentile(sim_result, 97.5) 
-            sims_result.append([errs, CIs])
+            sims_result.append([errs, CIs, stds])
         return(sims_result)
     def plot_varyk(self, sims_result, ks, labels, title, name, fontsize = 18): 
         plt.figure(figsize=(6,5))
@@ -160,8 +167,10 @@ class Simulations(object):
         for i in range(len(self.dim_reduxs)):
             plt.plot(ks, sims_result[i][0], label = labels[i], \
                 marker = MARKER_LIST[i], ls ='-', color = COLOR_LIST[i])
-            plt.plot(ks, sims_result[i][1][0,:], ls = '--', color = COLOR_LIST[i] )
-            plt.plot(ks, sims_result[i][1][1,:], ls = '--', color = COLOR_LIST[i] )
+            #plt.plot(ks, sims_result[i][1][0,:], ls = '--', color = COLOR_LIST[i] )
+            #plt.plot(ks, sims_result[i][1][1,:], ls = '--', color = COLOR_LIST[i] )
+            plt.plot(ks, sims_result[i][0]+2*sims_result[i][2], ls = '--', color = COLOR_LIST[i] )
+            plt.plot(ks, sims_result[i][0]-2*sims_result[i][2], ls = '--', color = COLOR_LIST[i] )
         plt.legend(loc = 'best')
         plt.xlabel('Reduced Dimension')
         plt.ylabel('Ratio of Squared Norm after Random Projection')

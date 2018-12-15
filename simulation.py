@@ -6,12 +6,13 @@ geometric_median_matrices, norm_mean_matrices
 import matplotlib.ticker as ticker
 import warnings
 import hdmedians as hd 
+import math
 
 warnings.filterwarnings('ignore')
 
 class DimRedux(object):
     """docstring for DimRedux"""
-    def __init__(self, rm_typ, k, m, krao = False, krao_ms = [], vr = False, vr_num = 5, vr_typ = "mean"): 
+    def __init__(self, rm_typ, k, m, krao = False, krao_ms = [], vr = False, vr_num = 5, sparse_factor = 0.1, vr_typ = "mean"): 
         self.rm_typ = rm_typ
         self.k = k 
         self.m = m
@@ -20,8 +21,13 @@ class DimRedux(object):
         self.vr = vr
         self.vr_num = 1 if vr == False else vr_num 
         self.vr_typ = vr_typ
+        self.sparse_factor = sparse_factor
+        if rm_typ == 'sp0': 
+            self.sparse_factor = 1/3
+        elif rm_typ == 'sp1': 
+            self.sparse_factor = 1/np.sqrt(m)
     def get_info(self): 
-        return [self.rm_typ, self.k, self.m, self.krao, self.krao_ms, self.vr, self.vr_num, self.vr_typ] 
+        return [self.rm_typ, self.k, self.m, self.krao, self.krao_ms, self.vr, self.vr_num, self.sparse_factor, self.vr_typ] 
     def update_k(self, k): 
         self.k = k 
         return 
@@ -30,20 +36,20 @@ class DimRedux(object):
         for i in range(self.vr_num):  
             if not self.krao:
                 reduced_mats.append((random_matrix_generator(self.k,self.m,\
-                    self.rm_typ)/np.sqrt(self.k)) @ X )
+                    self.rm_typ, sparse_factor = self.sparse_factor)/np.sqrt(self.k)) @ X)
             elif self.krao_ms != []:  
                 assert(np.prod(np.asarray(self.krao_ms)) == self.m), \
                 "Please enter valid Khatri-Rao map, so that the product of Khatri-Rao map dimension matches the input dimension of X" 
                 mat_kraos = []
                 for i in range(len(self.krao_ms)): 
-                    mat_kraos.append(random_matrix_generator(self.k, self.krao_ms[i], self.rm_typ).T)
+                    mat_kraos.append(random_matrix_generator(self.k, self.krao_ms[i], self.rm_typ, sparse_factor = self.sparse_factor).T)
                 reduced_mats.append((tl.tenalg.khatri_rao(mat_kraos)).T @ X/ np.sqrt(self.k))
             else: 
                 # Here, if the Khatri-Rao random map dimension is not given, assume m = m0**2
                 m0 = int(np.sqrt(self.m))
                 mat_kraos = []
-                mat_kraos.append(random_matrix_generator(self.k,m0,self.rm_typ).T) 
-                mat_kraos.append(random_matrix_generator(self.k,m0,self.rm_typ).T)  
+                mat_kraos.append(random_matrix_generator(self.k,m0,self.rm_typ, sparse_factor = self.sparse_factor).T) 
+                mat_kraos.append(random_matrix_generator(self.k,m0,self.rm_typ, sparse_factor = self.sparse_factor).T)  
                 reduced_mats.append((tl.tenalg.khatri_rao(mat_kraos).T) @ X/np.sqrt(self.k)) 
         if self.vr_typ == "mean": 
             reduced_mat = sum(reduced_mats)/np.sqrt(self.vr_num)
@@ -58,7 +64,7 @@ class DimRedux(object):
         elif self.vr_typ == "median": 
             reduced_mat = reduced_mats[0] 
             for index,x in np.ndenumerate(reduced_mat): 
-                reduced_mat[index] = np.median([ mat[index] for mat in reduced_mats])
+                reduced_mat[index] = np.median([ mat[index] for mat in reduced_mats])*np.sqrt(self.vr_num*4/2*math.pi)
         else: 
             print("Please use either mean or geom_median_l1, or geom_median_l2 for vr_typ")
         return(reduced_mat, np.linalg.norm(reduced_mat)**2/np.linalg.norm(X)**2)
@@ -66,7 +72,7 @@ class DimRedux(object):
         reduced_mats = [] 
         for i in range(self.vr_num):  
             if not self.krao:
-                mat = random_matrix_generator(self.k,self.m,self.rm_typ) 
+                mat = random_matrix_generator(self.k,self.m,self.rm_typ, sparse_factor = self.sparse_factor) 
                 arm, _ = np.linalg.qr( (mat @ X).T)  
                 reduced_mats.append( X @ arm @ arm.T)
             elif self.krao_ms != []:  
@@ -74,7 +80,7 @@ class DimRedux(object):
                 "Please enter valid Khatri-Rao map, so that the product of Khatri-Rao map dimension matches the input dimension of X" 
                 mat_kraos = []
                 for i in range(len(self.krao_ms)): 
-                    mat_kraos.append(random_matrix_generator(self.k, self.krao_ms[i], self.rm_typ).T)
+                    mat_kraos.append(random_matrix_generator(self.k, self.krao_ms[i], self.rm_typ, sparse_factor = self.sparse_factor).T)
                 mat_krao = tl.tenalg.khatri_rao(mat_kraos).T
                 arm, _ = np.linalg.qr( (mat_krao @ X).T)  
                 reduced_mats.append( X @ arm @ arm.T)
@@ -82,8 +88,8 @@ class DimRedux(object):
                 # Here, if the Khatri-Rao random map dimension is not given, assume m = m0**2
                 m0 = int(np.sqrt(self.m))
                 mat_kraos = []
-                mat_kraos.append(random_matrix_generator(self.k,m0,self.rm_typ).T) 
-                mat_kraos.append(random_matrix_generator(self.k,m0,self.rm_typ).T)  
+                mat_kraos.append(random_matrix_generator(self.k,m0,self.rm_typ, sparse_factor = self.sparse_factor).T) 
+                mat_kraos.append(random_matrix_generator(self.k,m0,self.rm_typ, sparse_factor = self.sparse_factor).T)  
                 mat_krao = tl.tenalg.khatri_rao(mat_kraos).T 
                 arm, _ = np.linalg.qr( (mat_krao @ X).T)  
                 reduced_mats.append( X @ arm @ arm.T)
@@ -122,16 +128,16 @@ class Simulation(object):
 
     def run(self):
         np.random.seed(self.seed)
-        rm_typ, k, m, krao, krao_ms, vr, vr_num, vr_typ = self.dim_redux.get_info() 
+        rm_typ, k, m, krao, krao_ms, vr, vr_num, sparse_factor, vr_typ = self.dim_redux.get_info() 
         m, n = self.X.shape  
         return [self.dim_redux.run(self.X)[1] for i in range(self.num_runs)] 
     def run_colspace(self):
         np.random.seed(self.seed)
-        rm_typ, k, m, krao, kraos, vr, vr_num, vr_typ = self.dim_redux.get_info() 
+        rm_typ, k, m, krao, kraos, vr, vr_num, sparse_factor, vr_typ = self.dim_redux.get_info() 
         m, n = self.X.shape  
         return [self.dim_redux.run_colspace(self.X)[1] for i in range(self.num_runs)]   
 
-MARKER_LIST = ["s", "x", "o","+","*","d","^"]
+MARKER_LIST = ["d", "s", "x", "o","+","*","^"]
 LINE_LIST = ['-', '--',':','-.','-.','-.','-.','-.']
 COLOR_LIST = ['r', 'g','orange', 'violet', 'b','black','y']
 
@@ -168,12 +174,18 @@ class Simulations(object):
                 marker = MARKER_LIST[i], ls ='-', color = COLOR_LIST[i])
             #plt.plot(ks, sims_result[i][1][0,:], ls = '--', color = COLOR_LIST[i] )
             #plt.plot(ks, sims_result[i][1][1,:], ls = '--', color = COLOR_LIST[i] )
-            plt.plot(ks, sims_result[i][0]+2*sims_result[i][2], ls = '--', color = COLOR_LIST[i] )
-            plt.plot(ks, sims_result[i][0]-2*sims_result[i][2], ls = '--', color = COLOR_LIST[i] )
+            plt.plot(ks, sims_result[i][0]+2*sims_result[i][2], ls = '--', color = COLOR_LIST[i], marker = MARKER_LIST[i], fillstyle = 'none')
+            plt.plot(ks, sims_result[i][0]-2*sims_result[i][2], ls = '--', color = COLOR_LIST[i], marker = MARKER_LIST[i], fillstyle = 'none')
         plt.legend(loc = 'best')
         plt.xlabel('Reduced Dimension')
-        plt.ylabel('Ratio of Squared Norm after Random Projection')
+        plt.ylabel('Ratio of Squared Norm')
         plt.title(title)
+        plt.axes().title.set_fontsize(fontsize)
+        plt.axes().xaxis.label.set_fontsize(fontsize)
+        plt.axes().yaxis.label.set_fontsize(fontsize)
+        plt.rc('legend',fontsize = fontsize)
+        plt.rc('xtick', labelsize = fontsize) 
+        plt.rc('ytick', labelsize = fontsize) 
         plt.tight_layout()
         plt.savefig('plots/'+name+'.pdf')
         plt.show()
@@ -207,6 +219,14 @@ class Simulations(object):
         plt.ylabel('Relative Error')
         plt.title(title)
         plt.tight_layout()
+
+        plt.axes().title.set_fontsize(fontsize)
+        plt.axes().xaxis.label.set_fontsize(fontsize)
+        plt.axes().yaxis.label.set_fontsize(fontsize)
+        plt.rc('legend',fontsize = fontsize)
+        plt.rc('xtick', labelsize = fontsize) 
+        plt.rc('ytick', labelsize = fontsize) 
+
         plt.savefig('plots/'+name + '.pdf')
         plt.show()
 
@@ -253,9 +273,12 @@ if __name__ == '__main__':
     redux4 = DimRedux('sp0',k, m) 
     redux5 = DimRedux('sp1',k, m) 
     redux6 = DimRedux('g',k, m, krao = True) 
-    redux7 = DimRedux('g',k, m, krao = True, vr = True, vr_typ = 'mean') 
+    redux7 = DimRedux('g',k, m, krao = True, vr = True, vr_typ = 'mean')  
+    redux8 = DimRedux('sp', k, m, krao =True, krao_ms = [10, 10,4],sparse_factor = 0.1)
     reduxs1 = [redux1, redux2, redux3, redux4, redux5] 
     reduxs2 = [redux1, redux6, redux7]
+
+    print(redux8.run(X))
 
 
 

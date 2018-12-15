@@ -172,7 +172,6 @@ def norm_mean_matrices(Xs):
     X2s = [X**2 for X in Xs] 
     return np.sqrt(sum(X2s)/len(Xs))
 
-
 '''
 class Simulation(object):
     """

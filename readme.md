@@ -1,0 +1,12 @@
+# Tensor Random Projection 
+
+## Introduction 
+
+In this project, we implement the Tensor Random Projection based on the Khatri-Rao product and extend it to matrix sketching. We run the experiment with simiulated data and the MNIST data. 
+
+## Files 
+1. util.py: Helper functions for data generation, variance reduction, and others. 
+2. simulation.py: Function for creating simulation for both random projection and sketching. 
+3. nips_simulation.py: Run experiments for norm preservation and sketching with simulated data on server. 
+4. minst.py: Evaluate the result for inner product preservation with MNIST data on server. 
+5. 
